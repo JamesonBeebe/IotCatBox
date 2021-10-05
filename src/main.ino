@@ -27,6 +27,10 @@ WiFiClient client;
 #include <AsyncElegantOTA.h>
 AsyncWebServer otaServer(1234);
 
+/************************ GUI *********************************/
+#include "index.h"
+AsyncWebServer gui(80);
+
 /************************ Define IO pins ************************/
 
 #include "HX711.h"
@@ -40,7 +44,7 @@ HX711 scale;                        // Scale initialization
 
 float weight = 0;
 float sandWeight = 0;
-float platformWeight = 1.7; // weight of the platform in lbs
+float platformWeight = 1.8; // weight of the platform in kg
 float weightbox = 0.7;      // Weight of empty box
 
 float cat1MinWeight = 2;   // expected minimum weight for cat #1
@@ -70,6 +74,12 @@ int seconds0;         // Last time the clock was updated
 
 /********************** Local Defines ***************************/
 //#define __local_wifi__
+
+String readWeight(void);
+String processor(const String &var);
+void zeroScale(void);
+void restartEsp(void);
+void resetScale(void);
 
 void setup()
 {
@@ -134,12 +144,35 @@ void setup()
   otaServer.begin();
   Serial.println("HTTP OTA server started");
 
+  //Start GUI
+  gui.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+         { request->send_P(200, "text/html", index_html, processor); });
+  gui.on("/zero", HTTP_GET, [](AsyncWebServerRequest *request)
+         { zeroScale(); });
+  gui.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request)
+         { restartEsp(); });
+  gui.on("/resetscale", HTTP_GET, [](AsyncWebServerRequest *request)
+         { resetScale(); });
+  gui.begin();
+
+  //Start ThingSpeak interface
   ThingSpeak.begin(client); // Initialize ThingSpeak
 
   // Read saved values
   cat1Uses = ThingSpeak.readLongField(myChannelNumber, 5, readAPIKey);
   cat2Uses = ThingSpeak.readLongField(myChannelNumber, 6, readAPIKey);
   sandWeight = ThingSpeak.readLongField(myChannelNumber, 4, readAPIKey);
+
+  // prime the read Reed Switch
+  prev_reed_switch_value = digitalRead(reed_switch_PIN);
+  if (prev_reed_switch_value == 0)
+  {
+    ThingSpeak.setField(3, 1);
+  }
+  else
+  {
+    ThingSpeak.setField(3, 0);
+  }
 }
 
 void loop()
@@ -155,12 +188,16 @@ void loop()
     ThingSpeak.setField(6, cat2Uses);
   }
 
+  // prepare to updated status of the box on Thingspeak if lid changed
+
   // read Reed Switch
   reed_switch_value = digitalRead(reed_switch_PIN);
 
-  // prepare to updated status of the box on Thingspeak if lid changed
-
-  if (reed_switch_value == 0)
+  if (reed_switch_value == prev_reed_switch_value)
+  {
+    //do nothing
+  }
+  else if (reed_switch_value == 0)
   {
     ThingSpeak.setField(3, 1);
   }
@@ -168,6 +205,7 @@ void loop()
   {
     ThingSpeak.setField(3, 0);
   }
+
   /*
   if((reed_switch_value==1) && (prev_reed_switch_value != reed_switch_value)){
     ThingSpeak.setField(3, 0);
@@ -382,4 +420,102 @@ void getTime()
     Serial.print("0");
   }
   Serial.println(minutes);
+}
+
+String readWeight(void)
+{
+  float tempWeight = scale.get_units();
+  float tempSandWeight = 0;
+  float tempWeightBox = 0;
+  float tempPlatformWeight = 0;
+
+
+if(tempWeight>=platformWeight){
+  tempPlatformWeight = platformWeight;
+  
+  if(tempWeight>=(platformWeight+weightbox)){
+    tempWeightBox = weightbox;
+
+    if(tempWeight>=(platformWeight+weightbox+5))
+    tempSandWeight = sandWeight;
+  }
+}
+  Serial.print("Platform weight: ");
+  Serial.println(tempPlatformWeight);
+  Serial.print("Box weight: ");
+  Serial.println(tempWeightBox);
+  Serial.print("Litter weight: ");
+  Serial.println(tempSandWeight);
+  
+  Serial.print("Compensated weight: ");
+  tempWeight = (tempWeight - tempSandWeight - tempWeightBox - tempPlatformWeight)*2.205;
+  Serial.println((tempWeight));
+
+    
+/*
+  //is there litter?
+  Serial.print("Litter weight: ");
+  if(tempWeight<(platformWeight+weightbox+1)){
+    tempSandWeight = 0;
+  }
+  else{
+    tempSandWeight = sandWeight;
+  }
+  Serial.println(tempSandWeight);
+
+  //is there a box?
+  Serial.print("Box weight: ");
+  if((platformWeight + weightbox)>tempWeight>=platformWeight){
+    tempWeightBox = 0;
+  }
+  else {
+    tempWeightBox = weightbox;
+  }
+  Serial.println(tempWeightBox);
+
+  //is there a platform?
+  Serial.print("Platform Weight: ");
+  if(tempWeight<platformWeight){
+    tempPlatformWeight = 0;
+  }
+  else{
+    tempPlatformWeight = platformWeight;
+  }
+  Serial.println(tempPlatformWeight);
+
+  Serial.print("compensated weight: ");
+  tempWeight = tempWeight - tempSandWeight - tempWeightBox - tempPlatformWeight;
+  Serial.println((tempWeight));
+*/
+  return String(tempWeight);
+}
+
+// Replaces placeholder with DHT values
+String processor(const String &var)
+{
+  //Serial.println(var);
+  if (var == "WEIGHT")
+  {
+    return readWeight();
+  }
+  return String();
+}
+
+void zeroScale(void)
+{
+  scale.tare(); //reset the scale weight
+}
+
+void restartEsp()
+{
+  ESP.reset();
+}
+
+void resetScale()
+{
+  scale.power_down();
+  delay(250);
+  scale.power_up();
+  //scale.begin(DOUT, CLK);
+  scale.set_scale(calibration_factor);
 }
