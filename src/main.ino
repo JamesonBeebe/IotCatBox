@@ -29,7 +29,7 @@ AsyncWebServer otaServer(1234);
 
 /************************ GUI *********************************/
 #include "index.h"
-AsyncWebServer gui(80);
+AsyncWebServer gui(2468);
 
 /************************ Define IO pins ************************/
 
@@ -162,17 +162,6 @@ void setup()
   cat1Uses = ThingSpeak.readLongField(myChannelNumber, 5, readAPIKey);
   cat2Uses = ThingSpeak.readLongField(myChannelNumber, 6, readAPIKey);
   sandWeight = ThingSpeak.readLongField(myChannelNumber, 4, readAPIKey);
-
-  // prime the read Reed Switch
-  prev_reed_switch_value = digitalRead(reed_switch_PIN);
-  if (prev_reed_switch_value == 0)
-  {
-    ThingSpeak.setField(3, 1);
-  }
-  else
-  {
-    ThingSpeak.setField(3, 0);
-  }
 }
 
 void loop()
@@ -188,16 +177,12 @@ void loop()
     ThingSpeak.setField(6, cat2Uses);
   }
 
-  // prepare to updated status of the box on Thingspeak if lid changed
-
   // read Reed Switch
   reed_switch_value = digitalRead(reed_switch_PIN);
 
-  if (reed_switch_value == prev_reed_switch_value)
-  {
-    //do nothing
-  }
-  else if (reed_switch_value == 0)
+  // prepare to updated status of the box on Thingspeak if lid changed
+
+  if (reed_switch_value == 0)
   {
     ThingSpeak.setField(3, 1);
   }
@@ -205,7 +190,6 @@ void loop()
   {
     ThingSpeak.setField(3, 0);
   }
-
   /*
   if((reed_switch_value==1) && (prev_reed_switch_value != reed_switch_value)){
     ThingSpeak.setField(3, 0);
@@ -223,11 +207,11 @@ void loop()
   {
     Serial.println("Leaving cleaning mode"); // When it leaves cleaning mode, it shall wait some seconds and measure the weight of sand in the litter box
     delay(5000);
-    float weight0 = scale.get_units() - weightbox - platformWeight;
+    float weight0 = scale.get_units() - weightbox - platformWeight -soilLevel;
     float avgweight = 0;
     for (int i = 0; i <= NUM_MEASUREMENTS - 1; i++)
     { // Takes several measurements
-      weight = scale.get_units() - weightbox - platformWeight;
+      weight = scale.get_units() - weightbox - platformWeight - soilLevel;
       delay(100);
       avgweight += weight;
       if (abs(weight - weight0) > THRESHOLD)
@@ -250,16 +234,16 @@ void loop()
   if ((reed_switch_value == 0) && (prev_reed_switch_value == 0))
   {
     Serial.println("Running mode"); // On running mode the controller will measure the weight of the cats
-    weight = scale.get_units() - weightbox - platformWeight - sandWeight;
+    weight = scale.get_units() - weightbox - platformWeight - sandWeight - soilLevel;
 
     if (weight > cat1MinWeight)
     { // cat detected
       Serial.println("Cat detected!");
-      float weight0 = scale.get_units() - weightbox - platformWeight - sandWeight;
+      float weight0 = scale.get_units() - weightbox - platformWeight - sandWeight - soilLevel;
       float avgweight = 0;
       for (int i = 0; i <= NUM_MEASUREMENTS; i++)
       { // Takes several measurements
-        weight = scale.get_units() - weightbox - platformWeight - sandWeight;
+        weight = scale.get_units() - weightbox - platformWeight - sandWeight - soilLevel;
         delay(100);
         avgweight += weight;
         if (abs(weight - weight0) > THRESHOLD)
@@ -290,7 +274,7 @@ void loop()
       }
 
       // wait while there's someone on the scale
-      while ((scale.get_units() - weightbox - platformWeight - sandWeight) > cat1MinWeight)
+      while ((scale.get_units() - weightbox - platformWeight - sandWeight - soilLevel) > cat1MinWeight)
       {
         delay(1000);
       }

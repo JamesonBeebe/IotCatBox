@@ -41,9 +41,10 @@ const char index_html[] PROGMEM = R"rawliteral(
     <i class="fas fa-power-off" style="color:#7b5c00;"></i> 
     <button type="button" onclick="restartEsp();">Restart</button>
   </p>
-<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/1?&days=10&dynamic=true&results=10000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
-<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/2?&days=10&dynamic=true&results=10000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
-<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/7?&days=10&dynamic=true&results=10000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
+<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/1?&days=10&dynamic=true&results=100000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
+<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/2?&days=10&dynamic=true&results=100000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
+<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/7?&days=10&dynamic=true&results=100000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
+<iframe width="450" height="250" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/1357181/charts/4?&days=10&dynamic=true&results=100000&api_key=EAL7YI5W5NF0Q8SQ"></iframe>
 
 
 </body>
