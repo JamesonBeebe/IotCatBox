@@ -40,9 +40,9 @@
 // - https://github.com/bogde/HX711/issues/75
 // - https://github.com/arduino/Arduino/issues/6561
 // - https://community.hiveeyes.org/t/using-bogdans-canonical-hx711-library-on-the-esp32/539
-uint8_t shiftInSlow(uint8_t dataPin, uint8_t clockPin, uint8_t bitOrder) {
-    uint8_t value = 0;
-    uint8_t i;
+byte shiftInSlow(byte dataPin, byte clockPin, byte bitOrder) {
+    byte value = 0;
+    byte i;
 
     for(i = 0; i < 8; ++i) {
         digitalWrite(clockPin, HIGH);
@@ -104,8 +104,8 @@ long HX711::read() {
 
 	// Define structures for reading data into.
 	unsigned long value = 0;
-	uint8_t data[3] = { 0 };
-	uint8_t filler = 0x00;
+	byte data[3] = { 0 };
+	byte filler = 0x00;
 
 	// Protect the read sequence from system interrupts.  If an interrupt occurs during
 	// the time the PD_SCK signal is high it will stretch the length of the clock pulse.

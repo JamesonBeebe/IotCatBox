@@ -1,3 +1,9 @@
 {
-    "idf.adapterTargetName": "esp32"
+    "idf.adapterTargetName": "esp32",
+    "files.associations": {
+        "*.cps": "javascript",
+        "*.py": "python",
+        "*.tcc": "cpp",
+        "random": "cpp"
+    }
 }
