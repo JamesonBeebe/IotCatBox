@@ -44,6 +44,10 @@ const char index_html[] PROGMEM = R"rawliteral(
 			<th>Riggins Uses</th>
 			<th id="cat2uses">%CAT2USES%</th>
 		</tr>
+    <tr>
+			<th>State</th>
+			<th id="state">%STATE%</th>
+		</tr>
 	</table>
   </p>
   <p>
@@ -130,20 +134,30 @@ function restartEsp() {
   xhttp.send();
 }
 
-setInterval(function ( ) {
+function updateValues() {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("weight").innerHTML = this.responseText;
+      var response = JSON.parse(this.responseText);
+      document.getElementById("weight").innerHTML = response.weight;
+      document.getElementById("state").innerHTML = response.state;
+      document.getElementById("cat1uses").innerHTML = response.cat1uses;  
+      document.getElementById("cat2uses").innerHTML = response.cat2uses;
+      document.getElementById("litterWeight").innerHTML = response.litterWeight;  
     }
   };
-  xhttp.open("GET", "/updateWeight", true);
+  xhttp.open("GET", "/getValues", true);
   xhttp.send();
+}
+
+setInterval(function ( ) {
+  updateValues();
 }, 2000);
 
-document.getElementById("myTable").rows[0].cells[1].innerHTML = variable1;
-document.getElementById("myTable").rows[1].cells[1].innerHTML = variable2;
-document.getElementById("myTable").rows[2].cells[1].innerHTML = variable3;
+//document.getElementById("myTable").rows[0].cells[1].innerHTML = variable1;
+//document.getElementById("myTable").rows[1].cells[1].innerHTML = variable2;
+//document.getElementById("myTable").rows[2].cells[1].innerHTML = variable3;
+//document.getElementById("myTable").rows[2].cells[1].innerHTML = variable4;
 
 </script>
 </html>)rawliteral";

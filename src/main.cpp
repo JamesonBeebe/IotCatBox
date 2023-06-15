@@ -4,13 +4,10 @@
 #include "HX711.h"
 #include "box.h"
 #include "cat.h"
-
 #include "ThingSpeak.h"
 #include "realsecrets.h"
-
 #include <ESP8266WiFi.h> // Wi-Fi
 #include <WiFiClient.h>  // Wi-Fi client
-
 #include <ESPAsyncTCP.h> //used for OTA and web GUI
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
@@ -56,7 +53,6 @@ Application *application = new Application(1.8);
 Box *box = new Box(0.7);
 /************************ Application Defines ************************/
 #define NUM_MEASUREMENTS 10 // Number of measurements
-#define THRESHOLD 0.2       // Restart averaging if the weight changes more than 0.2 kg.
 
 bool newData = false;
 
@@ -94,6 +90,9 @@ void readServerValues(void);
 void zeroCatUses(void);
 uint32_t getTime(void);
 float readScale(void);
+String getCurrentState(void);
+
+void initIWDT(void);
 
 void resetting(void);
 void runningLoop(void);
@@ -110,12 +109,12 @@ enum State
     prevState;
 
 void setup()
-{
+{ 
+  currentState = initializing;
+  //initIWDT();
   // scale = new HX711();
   box = new Box(0.7);                 // initialize box with weight of 0.7 Kg's
   application = new Application(1.8); // initialize the application with a platform weight of 1.8 Kg's
-  currentState = running;
-  prevState = cleaning;
 
   // Start the serial connection
   Serial.begin(115200);
@@ -192,7 +191,14 @@ void setup()
   gui.on("/rigginsUses", HTTP_GET, [](AsyncWebServerRequest *request)
          { request->send(200, "text/plain", String(cat2->getUses())); });
   gui.on("/whiskeyUses", HTTP_GET, [](AsyncWebServerRequest *request)
-         { request->send(200, "text/plain", String(cat1->getUses())); });         
+         { request->send(200, "text/plain", String(cat1->getUses())); }); 
+  gui.on("/updateState", HTTP_GET, [](AsyncWebServerRequest *request)
+         { request->send(200, "text/plain", String(getCurrentState())); });
+  // Route for getting variable values
+  gui.on("/getValues", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String response = String("{\"weight\":") + String(box->getCurrentWeight()) + String(",\"state\":") + getCurrentState() + String(",\"cat1uses\":") + String(cat1->getUses()) + String(",\"cat2uses\":") + String(cat2->getUses()) + String(",\"litterWeight\":") + String(box->getSandWeight()) + "}";
+    request->send(200, "application/json", response);
+  });          
   gui.on("/zero", HTTP_GET, [](AsyncWebServerRequest *request)
          { zeroScale(); });
   gui.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -216,6 +222,7 @@ void setup()
   box->getSandWeight() = ThingSpeak.readFloatField(myChannelNumber, SAND_WEIGHT, readAPIKey);
   Serial.println("ThingSpeak Client Running");
   */
+ prevState = initializing;
 }
 
 void loop()
@@ -227,7 +234,6 @@ void loop()
   }
 
   box->setCurrentWeight(readScale());
-
   switch (prevState)
   {
   case initializing:
@@ -243,10 +249,8 @@ void loop()
     break;
 
   case running:
-    if ((box->getCurrentWeight() < (box->getLastWeight() - THRESHOLD)))
+    if ((box->getCurrentWeight() < (0-THRESHOLD)))
     {                                  // someone lifted the box off the platform
-      Serial.println("Cleaning Mode"); // When it leaves running mode, it will stop measuring the weight (do nothing)
-      zeroCatUses();
       currentState = cleaning;
     }
     if (box->catPresent())
@@ -257,7 +261,7 @@ void loop()
     break;
 
   case cat:
-    if (box->getCurrentWeight() < box->getLastWeight())
+    if (box->getCurrentWeight() < (box->getLastWeight() - THRESHOLD))
     {
       currentState = running;
     }
@@ -266,7 +270,10 @@ void loop()
   default:
     break;
   }
-
+/**
+ * @brief Construct a new switch object
+ * 
+ */
   switch (currentState)
   {
   case running:
@@ -416,12 +423,15 @@ void loop()
 
       case 404:
         Serial.println("Incorrect API key or invalid ThingSpeak server address.");
+        break;
 
       case -301:
         Serial.println("Failed to connect to ThingSpeak.");
+        break;
 
       case -304:
         Serial.println("Timeout waiting for server to respond.");
+        break;
 
       default:
         break;
@@ -436,6 +446,7 @@ void loop()
 
 void runningLoop(void)
 {
+  //ESP.wdtFeed();
   // weight = scale->get_units() - box->getBoxWeight() - application->getPlatformWeight() - box->getSandWeight() - box->getPooWeight();
   readWeight();
   prevState = running;
@@ -443,6 +454,7 @@ void runningLoop(void)
 
 void cleaningLoop(void)
 {
+  //ESP.wdtFeed();
   prevState = cleaning;
 }
 
@@ -462,6 +474,7 @@ void catLoop(void)
   bool cat1Use=false;
   box->setLastWeight(box->getCurrentWeight());
   delay(5000);  //give the box weight time to settle with a cat
+
   while(!scale->wait_ready_retry());
   tmpWeight = scale->get_units(10);
   tmpWeight2 = tmpWeight;//just used as a placeholder
@@ -497,7 +510,7 @@ void catLoop(void)
   }
 
   // wait while there's someone on the scale
-  while ((scale->get_units() - box->getPooWeight()) > cat1->getMinWeight())
+  while ((readScale() - box->getPooWeight()) > cat1->getMinWeight())
   {
     delay(1000);
   }
@@ -647,7 +660,6 @@ String readWeight(void)
 // Replaces placeholder with DHT values
 String processor(const String &var)
 {
-  // Serial.println(var);
   if (var == "WEIGHT")
   {
     return readWeight();
@@ -720,4 +732,17 @@ float readScale(void)
 {
   scale->wait_ready_retry(3, 10);
   return scale->get_units(3);
+}
+
+String getCurrentState(void){
+  return String(currentState);
+}
+
+// Initialize IWDT
+void initIWDT(void) {
+  ESP.wdtDisable();  // Disable the WDT (in case it was previously enabled)
+
+  // Configure IWDG
+  ESP.wdtEnable(WDTO_8S);  // Enable the IWDG with a timeout of 8 seconds
+  ESP.wdtFeed();
 }

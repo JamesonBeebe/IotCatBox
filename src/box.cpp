@@ -2,6 +2,7 @@
 #include "cat.h"
 #include "application.h"
 
+extern Cat *cat1;
 
 extern Application *application;
 Box::Box(float weight=0.7)
@@ -64,7 +65,7 @@ void Box::setLastWeight(float weight){
 
 bool Box::catPresent(void){
     //float scaleWeight = scale->get_units(3);
-    if(this->currentWeight > (this->boxWeight + this->sandWeight + this->pooWeight + application->getPlatformWeight())){
+    if(this->currentWeight > (this->pooWeight + cat1->getMinWeight())){
         return true;
     }
     else
