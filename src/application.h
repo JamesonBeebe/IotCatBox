@@ -1,7 +1,11 @@
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
-#define THRESHOLD 0.2       // Restart averaging if the weight changes more than 0.2 kg.
+#define MEASUREMENT_TOLERANCE 0.2       // Restart averaging if the weight changes more than 0.2 kg.
+#define TRANSITION_THRESHOLD 2    // general threshold for switching states
+
+#define SOFTWARE_VERSION_MAJOR  1
+#define SOFTWARE_VERSION_MINOR  0
 
 class Application {
   private:

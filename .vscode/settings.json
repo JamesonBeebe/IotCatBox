@@ -4,6 +4,7 @@
         "*.cps": "javascript",
         "*.py": "python",
         "*.tcc": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "*.html": "cpp"
     }
 }
