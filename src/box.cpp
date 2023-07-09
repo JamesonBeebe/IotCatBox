@@ -75,7 +75,7 @@ bool Box::weightIsStable(void)
     {
         this->settlingTime = millis(); // reset timer
     }
-    Serial.println("Weight unstable: " + String(this->currentWeight) + " lbs");
+    Serial.println("Weight unstable: " + String(this->currentWeight));
     return false;
 }
 
