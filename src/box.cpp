@@ -10,6 +10,10 @@ Box::Box(float weight = 0.7)
     this->boxWeight = boxWeight;
 }
 
+Box::~Box()
+{
+}
+
 float Box::getSandWeight(void)
 {
     return this->sandWeight;
@@ -71,6 +75,7 @@ bool Box::weightIsStable(void)
     {
         this->settlingTime = millis(); // reset timer
     }
+    Serial.println("Weight unstable: " + String(this->currentWeight) + " lbs");
     return false;
 }
 
@@ -88,5 +93,6 @@ bool Box::catPresent(void)
 
 void Box::zeroPooValue(void)
 {
+    Serial.println("Zeroing poo value");
     this->setPooWeight(0);
 }

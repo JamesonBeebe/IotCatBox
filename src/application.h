@@ -5,7 +5,7 @@
 #define TRANSITION_THRESHOLD 2    // general threshold for switching states
 
 #define SOFTWARE_VERSION_MAJOR  1
-#define SOFTWARE_VERSION_MINOR  0
+#define SOFTWARE_VERSION_MINOR  2
 
 class Application {
   private:

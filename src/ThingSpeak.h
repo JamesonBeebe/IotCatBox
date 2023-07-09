@@ -20,7 +20,7 @@
 
     #define TS_VER "2.0.0"
 
-    #include "Arduino.h"
+    #include <Arduino.h>
     #include <Client.h>
 
     #define THINGSPEAK_URL "api.thingspeak.com"
@@ -1597,7 +1597,7 @@
             // make sure all of the HTTP request is pushed out of the buffer before looking for a response
             this->client->flush();
             
-            long timeoutTime = millis() + TIMEOUT_MS_SERVERRESPONSE;
+            unsigned long timeoutTime = millis() + TIMEOUT_MS_SERVERRESPONSE;
             
             while(this->client-> available() < 17){
                 delay(2);

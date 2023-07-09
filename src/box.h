@@ -1,8 +1,7 @@
 #ifndef BOX_H
 #define BOX_H
-#include <Arduino.h>
 
-#define SETTLING_TIME 2000
+#define SETTLING_TIME 7000
 
 class Box {
   private:

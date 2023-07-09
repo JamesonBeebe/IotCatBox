@@ -1,4 +1,3 @@
-#include <string.h>
 #include "application.h"
 #include "cat.h"
 

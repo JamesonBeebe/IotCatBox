@@ -12,9 +12,9 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
 #include "index.htm"
-
+#include "version.h"
 /************************ Thingspeak  Configuration ************************/
-
+#define NO_SERVER
 // visit thingspeak.com if you need to create an account or if you need your write key.
 unsigned long myChannelNumber = SECRET_CH_ID;
 const char *apiKey = SECRET_WRITE_APIKEY;
@@ -98,6 +98,7 @@ void runningLoop(void);
 void cleaningLoop(void);
 void catLoop(void);
 void weighCat(void);
+void waitForScaleStable(void);
 
 enum State
 {
@@ -117,7 +118,7 @@ void setup()
   // Start the serial connection
   Serial.begin(115200);
   Serial.println("IoT CatBox by: Jameson Beebe\r\n");
-  Serial.printf("V%d.%d\r\n", SOFTWARE_VERSION_MAJOR, SOFTWARE_VERSION_MINOR);
+  Serial.printf("V%s\r\n", VERSION);
 
   
   pinMode(reed_switch_PIN, INPUT_PULLUP); //This is for a Mag Switch if one is used for the Lid (not currently implemented)
@@ -142,7 +143,7 @@ void setup()
     count++;
   }
 
-  if ((WiFi.status() != !WL_CONNECTED))
+  if ((WiFi.status() != WL_CONNECTED))
   { // Local Auto-connect did not happen, start WiFi SmartConfig
     WiFi.mode(WIFI_AP_STA);
     // Start WiFi Smart Config
@@ -206,7 +207,7 @@ void setup()
   gui.begin();
 
   // Start ThingSpeak interface
-  ThingSpeak.begin(client); // Initialize ThingSpeak
+  ThingSpeak.begin(client);
 }
 
 void loop()
@@ -214,30 +215,32 @@ void loop()
   currentState = nextState;
 
   // Controls state changes and it's also the "current weight" for each State
-  box->setLastWeight(box->getCurrentWeight());
-  box->setCurrentWeight(readScaleFloat());
+  readScaleFloat();
 
   if (box->weightIsStable())
   {
-    Serial.println("Weight: STABLE");
 
-    switch (currentState)
-    {
+  switch (currentState)
+  {
     case initializing:
-      Serial.println(getCurrentState());
+      //Serial.println(getCurrentState());
       // ThingSpeak.setField(RUN_STATE, currentState);
       // newData = true;
+      Serial.println("Entering running mode...");
       nextState = running;
       break;
 
     case cleaning:
       currentState = cleaning;
-      Serial.println(getCurrentState());
+      //Serial.println(getCurrentState());
       cleaningLoop();
 
-      if ((box->getCurrentWeight() > MEASUREMENT_TOLERANCE))
-      {                                             // someone put the box on the platform
-        Serial.println("Leaving cleaning mode..."); // When it leaves cleaning mode, it shall wait some seconds and measure the weight of sand in the litter box
+      if ((box->getCurrentWeight() >
+           MEASUREMENT_TOLERANCE)) { // someone put the box on the platform
+        Serial.println(
+            "Leaving cleaning mode..."); // When it leaves cleaning mode, it
+                                         // shall wait some seconds and measure
+                                         // the weight of sand in the litter box
         nextState = running;
         resetting();
         Serial.print("Current Weight: ");
@@ -249,24 +252,24 @@ void loop()
 
     case running:
       currentState = running;
-      Serial.println(getCurrentState());
+      //Serial.println(getCurrentState());
 
       runningLoop();
 
-      if ((box->getCurrentWeight() < (-MEASUREMENT_TOLERANCE)))
-      { // someone lifted the box off the platform
-
+      // someone lifted the box off the platform
+      if (box->getCurrentWeight() < (-MEASUREMENT_TOLERANCE))
+      {
         nextState = cleaning;
 
-        Serial.print("Current Weight: ");
-        Serial.println(box->getCurrentWeight());
-        Serial.print("Next State: ");
-        Serial.println(getNextState());
-
+        Serial.println("Current Weight: " + String(box->getCurrentWeight()));
+        Serial.println("Next State: " + String(getNextState()));
+        Serial.println("Entering cleaning mode...");
         zeroScale(); // zero scale to more easily detect state transition
       }
+      
+      // cat entered the box
       if (box->catPresent())
-      { // cat entered the box
+      {
         Serial.println("Cat detected!");
         nextState = cat;
         weighCat();
@@ -280,11 +283,11 @@ void loop()
 
     case cat:
       currentState = cat;
-      Serial.println(getCurrentState());
+      //Serial.println(getCurrentState());
 
       if (!box->catPresent())
       {
-        catLoop();
+        catLoop();	//JAM look here. Should this be somewhere else? When do you take Cat measurements?
 
         nextState = running;
 
@@ -299,11 +302,8 @@ void loop()
       break;
     }
   }
-  else
-  {
-    Serial.println("Weight: UNSTABLE");
-  }
 
+  #ifndef NO_SERVER
   if (newData)
   {
     gui.end();
@@ -339,6 +339,7 @@ void loop()
     client.stop();
     gui.begin();
   }
+  #endif
 }
 
 void runningLoop(void)
@@ -354,23 +355,30 @@ void cleaningLoop(void)
 void weighCat(void)
 {
   float tmpWeight = 0;
+  //At this point, there should only be the weight of poo in the box
 
   tmpWeight = readScaleFloat();
-  tmpWeight -= box->getPooWeight(); // subtract out the previous poo weight to reveal (cat weight + poo weight)
+  tmpWeight -= box->getPooWeight(); // subtract out the previous poo weight to reveal (cat weight + poo in cat weight)
 
   if ((tmpWeight >= cat1->getMinWeight()) && (box->getCurrentWeight() <= cat1->getMaxWeight()))
   { // cat #1 detected
     cat1Use = true;
     cat1->incrementUses();
+    cat1->setCurrentWeight(tmpWeight);
+    Serial.println("Cat 1 weight: " + String(cat1->getCurrentWeight()*2.2) + " lbs");
 
-    ThingSpeak.setField(CAT_1_USES, cat1->getUses());
+    ThingSpeak.setField(CAT_1_WEIGHT,(float)(cat1->getCurrentWeight()*2.2));
+    ThingSpeak.setField(CAT_1_USES, (int)cat1->getUses());
     newData = true;
   }
   else if (tmpWeight >= cat2->getMinWeight())
   { // cat #2 detected
     cat2->incrementUses();
+    cat2->setCurrentWeight(tmpWeight);
+    Serial.println("Cat 2 weight: " + String(cat2->getCurrentWeight()*2.2) + " lbs");
 
-    ThingSpeak.setField(CAT_2_USES, cat2->getUses());
+    ThingSpeak.setField(CAT_2_WEIGHT,(float)(cat2->getCurrentWeight()*2.2));
+    ThingSpeak.setField(CAT_2_USES, (int)cat2->getUses());
     newData = true;
   }
   else
@@ -387,19 +395,20 @@ void weighCat(void)
  * second measurement = poop in cat + poop
  */
 void catLoop(void)
-{
-  // update the level of poop in the box
+{ 
+  static uint16_t i = 0;
+  Serial.println("Cat in box" + String(i++));
   box->setPooWeight(box->getCurrentWeight());
 
   if (cat1Use)
   {
     cat1->setCurrentWeight(box->lastStableWeight - box->getPooWeight());
-    ThingSpeak.setField(CAT_1_WEIGHT, cat1->getCurrentWeight()); // set measured value to cat #1
+    ThingSpeak.setField(CAT_1_WEIGHT, (float)(cat1->getCurrentWeight()*2.2)); // set measured value to cat #1
   }
   else
   {
     cat2->setCurrentWeight(box->lastStableWeight - box->getPooWeight());
-    ThingSpeak.setField(CAT_2_WEIGHT, cat2->getCurrentWeight()); // set measured value to cat #2
+    ThingSpeak.setField(CAT_2_WEIGHT, (float)(cat2->getCurrentWeight()*2.2)); // set measured value to cat #2
   }
 
   ThingSpeak.setField(POO_WEIGHT, (float)(box->getPooWeight() * 2.2)); // convert to lbs and send to ThingSpeak
@@ -409,34 +418,30 @@ void catLoop(void)
 
 void resetting(void)
 {
+  resetScale();
+  Serial.println("Resetting scale...");
   float weight0 = scale->get_units(3) - box->getBoxWeight() - application->getPlatformWeight();
   float avgweight = 0;
-  for (int i = 0; i <= NUM_MEASUREMENTS - 1; i++)
-  { // Takes several measurements
-    weight = scale->get_units(3) - box->getBoxWeight() - application->getPlatformWeight();
-    delay(100);
-    avgweight += weight;
-    if (abs(weight - weight0) > MEASUREMENT_TOLERANCE)
-    {
-      avgweight = 0;
-      i = 0;
-    }
-    weight0 = weight;
+
+  Serial.println("Waiting for scale to stabilize...");
+  // wait for scale to stabilize
+  while(!box->weightIsStable()){
+    Serial.println("Unstable RESETTING weight: " + (String)(readScaleFloat())); 
+    delay(200);
   }
-  box->setSandWeight((avgweight / NUM_MEASUREMENTS) - box->getBoxWeight() - application->getPlatformWeight());
-  Serial.print("Measured sand weight: ");
-  Serial.print((box->getSandWeight() * 2.2), 2);
-  Serial.println(" lbs");
-  ThingSpeak.setField(SAND_WEIGHT, box->getSandWeight());
 
-  // reset soil level after cleaning
+  box->setSandWeight(box->getCurrentWeight() - box->getBoxWeight() - application->getPlatformWeight());
+  Serial.println("Measured sand weight: " + String((float)(box->getSandWeight()*2.2)) + " lbs");
+
+  ThingSpeak.setField(SAND_WEIGHT, (float)(box->getSandWeight()*2.2));
+
+  // reset soil level and scale after cleaning and getting an accurate reading
   box->zeroPooValue();
-
+  zeroCatUses();
   zeroScale();
 
   box->setCurrentWeight(readScaleFloat());
   box->setLastWeight(readScaleFloat());
-
   if (currentState != initializing)
   {
     ThingSpeak.setField(POO_WEIGHT, box->getPooWeight());
@@ -503,9 +508,14 @@ uint32_t getTime()
 
 String readWeightString(void)
 {
-  scale->wait_ready_retry(3, 100);
-  box->setCurrentWeight(scale->get_units(3));
-  return String(box->getCurrentWeight());
+  if(scale->wait_ready_retry(5, 100)){
+    box->setCurrentWeight(scale->get_units(5));  
+    return String(box->getCurrentWeight());
+  }
+  else{
+    Serial.println("Scale not ready to read");
+  }
+  return String();
 }
 
 // Replaces placeholder with DHT values
@@ -520,8 +530,12 @@ String processor(const String &var)
 
 void zeroScale(void)
 {
-  scale->wait_ready_retry(3, 10);
-  scale->tare(); // reset the scale weight
+  Serial.println("Zeroing scale");
+  if(scale->wait_ready_retry(10, 100)){
+    scale->tare();
+  } else {
+    Serial.println("Scale not ready to tare");
+  }
 }
 
 void restartEsp()
@@ -531,11 +545,21 @@ void restartEsp()
 
 void resetScale()
 {
-  scale->wait_ready_retry(3, 100);
-  scale->power_down();
-  scale->power_up();
-  scale->wait_ready_timeout(3000, 100);
-  scale->set_scale(calibration_factor);
+  Serial.println("Resetting scale");
+
+  WDT_FEED();
+  if(scale->wait_ready_retry(10, 100)){
+    scale->power_down();
+    delay(1000);
+    scale->power_up();
+  } else {
+    Serial.println("Scale not ready to reset");
+    return;
+  }
+
+  if(scale->wait_ready_timeout(10, 100)){
+    scale->set_scale(calibration_factor);
+  }
 }
 
 float getLastFieldValue(unsigned long field)
@@ -553,15 +577,21 @@ void readServerValues(void)
 
 void zeroCatUses(void)
 {
+  Serial.println("Zeroing cat uses");
   cat1->setUses(0);
   cat2->setUses(0);
 }
 
 float readScaleFloat(void)
 {
+  static uint16_t i = 0;
   box->setLastWeight(box->getCurrentWeight());
-  scale->wait_ready_retry(3, 10);
-  box->setCurrentWeight(scale->get_units(3));
+  if(scale->wait_ready_retry(3, 100)){
+    box->setCurrentWeight(scale->get_units(5));
+  }
+  else{
+    Serial.println("Scale not ready");
+  }
   return box->getCurrentWeight();
 }
 
@@ -625,4 +655,13 @@ void initIWDT(void)
   // Configure IWDG
   ESP.wdtEnable(WDTO_8S); // Enable the IWDG with a timeout of 8 seconds
   ESP.wdtFeed();
+}
+
+void waitForScaleStable(void){
+  Serial.println("Waiting for scale to stabilize");
+
+  while(!box->weightIsStable()){
+    box->setLastWeight(box->getCurrentWeight());
+    box->setCurrentWeight(readScaleFloat());
+    delay(100);}
 }
