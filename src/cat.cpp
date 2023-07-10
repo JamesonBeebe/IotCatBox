@@ -2,10 +2,11 @@
 #include "cat.h"
 
 // Constructor
-Cat::Cat(double minWeight, double maxWeight)
+Cat::Cat(double minWeight, double maxWeight, Gender catGender)
 {
     this->minWeight = minWeight;
     this->maxWeight = maxWeight;
+    this->gender = catGender;
 }
 
 // Getter functions

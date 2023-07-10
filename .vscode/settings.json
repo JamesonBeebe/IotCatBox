@@ -6,5 +6,6 @@
         "*.tcc": "cpp",
         "random": "cpp",
         "*.html": "cpp"
-    }
+    },
+    "idf.portWin": "COM8"
 }

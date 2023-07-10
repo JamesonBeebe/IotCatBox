@@ -55,8 +55,8 @@ bool scaleCalibrated = false;
 bool newData = false;
 
 /******************CATS******************/
-Cat *cat1 = new Cat(2, 6); // initialize cats with weights in Kg's
-Cat *cat2 = new Cat(6.3, 11);
+Cat *cat1 = new Cat(2, 6, FEMALE); // initialize cats with weights in Kg's
+Cat *cat2 = new Cat(6.3, 11, MALE);
 
 float weight = 0;
 
@@ -181,28 +181,17 @@ void setup()
   // Start GUI
   gui.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
          { request->send_P(200, "text/html", index_html, processor); });
-  gui.on("/updateWeight", HTTP_GET, [](AsyncWebServerRequest *request)
-         { request->send(200, "text/plain", String(box->getCurrentWeight())); });
-  gui.on("/litterWeight", HTTP_GET, [](AsyncWebServerRequest *request)
-         { request->send(200, "text/plain", String(box->getSandWeight())); });
-  gui.on("/rigginsUses", HTTP_GET, [](AsyncWebServerRequest *request)
-         { request->send(200, "text/plain", String(cat2->getUses())); });
-  gui.on("/whiskeyUses", HTTP_GET, [](AsyncWebServerRequest *request)
-         { request->send(200, "text/plain", String(cat1->getUses())); });
   gui.on("/updateState", HTTP_GET, [](AsyncWebServerRequest *request)
          { request->send(200, "text/plain", String(getCurrentState())); });
   // Route for getting variable values
   gui.on("/getValues", HTTP_GET, [](AsyncWebServerRequest *request)
          {
     String response = String("{\"weight\":") + String(box->getCurrentWeight()) + 
-                      String(",\"state\":") + "\"" + getCurrentState() + "\"" + "}";
+                      String(",\"state\":") + "\"" + getCurrentState() + "\"" + 
+                      String(",\"version\":") + "\"" + String(VERSION_SHORT) + "\"" + "}";
     request->send(200, "application/json", response); });
-  gui.on("/zero", HTTP_GET, [](AsyncWebServerRequest *request)
-         { zeroScale(); });
   gui.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request)
          { restartEsp(); });
-  gui.on("/resetscale", HTTP_GET, [](AsyncWebServerRequest *request)
-         { resetScale(); });
   gui.begin();
 
   // Start ThingSpeak interface
@@ -275,8 +264,7 @@ void loop()
 
     case cat:
       currentState = cat;
-
-
+      
       if (!box->catPresent())
       {
         nextState = running;
