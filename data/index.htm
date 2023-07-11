@@ -68,8 +68,8 @@
   </div>
   </p>
   <div class="container-fluid">
-    <button type="button" class="btn btn-primary btn-lg" onclick="cat1uses();"><i class="fa-solid fa-weight-scale"></i> Reset Platform Weight</button>
-    <button type="button" class="btn btn-primary btn-lg" onclick="cat1uses();"><i class="fa-solid fa-inbox"></i> Reset Box Weight</button>
+    <button type="button" class="btn btn-primary btn-lg" onclick="measurePlatformWeight();"><i class="fa-solid fa-weight-scale"></i> Measure Platform Weight</button>
+    <button type="button" class="btn btn-primary btn-lg" onclick="measureBoxWeight();"><i class="fa-solid fa-inbox"></i> Measure Box Weight</button>
   </div>
   <p>
     <button type="button" class="btn btn-primary btn-lg" onclick="restartEsp();"><i class="fa-solid fa-power-off"></i>
@@ -94,6 +94,24 @@
     xhttp.open("GET", "/litterWeight", true);
     xhttp.send();
   }
+
+  function measurePlatformWeight() {
+    var xhttp = new XMLHttpRequest();
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("platformWeight").innerHTML = this.responseText;
+    }
+    xhttp.open("GET", "/measurePlatform", true);
+    xhttp.send();
+  }
+
+  function measureBoxWeight() {
+    var xhttp = new XMLHttpRequest();
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("boxWeight").innerHTML = this.responseText;
+    }
+    xhttp.open("GET", "/measureBox", true);
+    xhttp.send();
+  }  
 
   function cat1uses() {
     var xhttp = new XMLHttpRequest();

@@ -1,0 +1,19 @@
+{
+    "ssid": "MyWiFiNetwork",
+    "password": "MyPassword123",
+    "platformWeight": 0.0,
+    "boxWeight": 0.0,
+    "pooWeight": 0.0,
+    "litterWeight": 0.0,
+    "numberOfCats": 1,
+    "cat1Name": "MyCat1",
+    "cat1Weight": 0.0,
+    "cat1MinWeight": 0.0,
+    "cat1MaxWeight": 0.0,
+    "cat1Uses": 0,
+    "cat2Name": "MyCat2",
+    "cat2Weight": 0.0,
+    "cat2MinWeight": 0.0,
+    "cat2MaxWeight": 0.0,
+    "cat2Uses": 0
+  }

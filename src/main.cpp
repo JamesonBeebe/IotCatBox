@@ -14,9 +14,11 @@
 #include "version.h"
 #include <LittleFS.h>
 #include <SPI.h>
+#include <ArduinoJson.h>
 
 /************************ FileSystem  Configuration ************************/
 const size_t MEMORY_SIZE = 16 * 1024 * 1024; // 16MB
+#define JSON_SIZE 17 //number of JSON entries
 
 /************************ Thingspeak  Configuration ************************/
 //#define NO_SERVER
@@ -40,6 +42,8 @@ const char *ssid = SECRET_SSID; // replace with your wifi ssid and wpa2 key
 const char *pass = SECRET_PASS;
 WiFiClient client;
 #define WIFI_TIMEOUT 20 // Wi-Fi Timeout for local connections (multiply this number by 500mS)
+const char* faviconPath = "/favicon.ico";
+
 
 /************************ OTA  Configuration ************************/
 AsyncWebServer otaServer(1234);
@@ -83,7 +87,6 @@ int seconds0;         // Last time the clock was updated
 // #define __local_wifi__
 
 String readWeightString(void);
-String processor(const String &var);
 void zeroScale(void);
 void restartEsp(void);
 void resetScale(void);
@@ -105,6 +108,7 @@ void weighCat(void);
 void waitForScaleStable(void);
 void measurePlatformWeight(void);
 void measureBoxWeight(void);
+void modifyJsonField(const char* filename, const char* field, const char* value);
 
 enum State
 {
@@ -131,8 +135,7 @@ void setup()
     Serial.println("An Error has occurred while mounting LittleFS");
     return;
   }
-  File file = LittleFS.open("/index.htm", "r");
-  
+
   pinMode(reed_switch_PIN, INPUT_PULLUP); //This is for a Mag Switch if one is used for the Lid (not currently implemented)
 
   scale->begin(DOUT, CLK); // Scale initialization
@@ -194,6 +197,10 @@ void setup()
   // Start GUI
   gui.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
          { request->send(LittleFS, "/index.htm", "text/html"); });         
+  // Serve favicon.ico
+  gui.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, faviconPath, "image/x-icon");
+  });  
   gui.on("/updateState", HTTP_GET, [](AsyncWebServerRequest *request)
          { request->send(200, "text/plain", String(getCurrentState())); });
   // Route for getting variable values
@@ -208,7 +215,7 @@ void setup()
   gui.on("/measurePlatform", HTTP_GET, [](AsyncWebServerRequest *request)
          { measurePlatformWeight(); });
   gui.on("/measureBox", HTTP_GET, [](AsyncWebServerRequest *request)
-         { restartEsp(); });
+         { measureBoxWeight(); });
   gui.begin();
 
   // Start ThingSpeak interface
@@ -361,7 +368,8 @@ void weighCat(void)
     cat1->incrementUses();
     cat1->setCurrentWeight(tmpWeight);
     Serial.println("Cat 1 weight: " + String(cat1->getCurrentWeight()*2.2) + " lbs, Uses: " + String(cat1->getUses()));
-
+    
+    // modifyJsonField("config.json", "cat1weight", String(cat1->getCurrentWeight()));
     ThingSpeak.setField(CAT_1_WEIGHT,(float)(cat1->getCurrentWeight()*2.2));
     ThingSpeak.setField(CAT_1_USES, (int)cat1->getUses());
     newData = true;
@@ -372,6 +380,7 @@ void weighCat(void)
     cat2->setCurrentWeight(tmpWeight);
     Serial.println("Cat 2 weight: " + String(cat2->getCurrentWeight()*2.2) + " lbs, Uses: " + String(cat2->getUses()));
 
+    // modifyJsonField("config.json", "cat2weight", String(cat2->getCurrentWeight()));
     ThingSpeak.setField(CAT_2_WEIGHT,(float)(cat2->getCurrentWeight()*2.2));
     ThingSpeak.setField(CAT_2_USES, (int)cat2->getUses());
     newData = true;
@@ -392,8 +401,9 @@ void weighCat(void)
 void measurePoopAfterCat(void)
 { 
   Serial.println("Cat Left the box... Weigh poop");
-  
+
   box->setPooWeight(readScaleFloat());
+  
   ThingSpeak.setField(POO_WEIGHT, (float)(box->getPooWeight() * 2.2)); // convert to lbs and send to ThingSpeak
 
   newData = true;
@@ -403,8 +413,6 @@ void resetting(void)
 {
   resetScale();
   Serial.println("Resetting scale...");
-  float weight0 = scale->get_units(3) - box->getBoxWeight() - application->getPlatformWeight();
-  float avgweight = 0;
 
   Serial.println("Waiting for scale to stabilize...");
   // wait for scale to stabilize
@@ -502,15 +510,6 @@ String readWeightString(void)
   return String();
 }
 
-// Replaces placeholder with DHT values
-String processor(const String &var)
-{
-  if (var == "WEIGHT")
-  {
-    return readWeightString();
-  }
-  return String();
-}
 
 void zeroScale(void)
 {
@@ -662,6 +661,7 @@ void measurePlatformWeight(void){
   application->setPlatformWeight(readScaleFloat());
   Serial.print("Platform weight: ");
   Serial.println(application->getPlatformWeight());
+  // modifyJsonField("/config.json", "platformWeight", String(application->getPlatformWeight()));
   }
 
 void measureBoxWeight(void){
@@ -669,4 +669,38 @@ void measureBoxWeight(void){
   box->setBoxWeight(readScaleFloat());
   Serial.print("Box weight: ");
   Serial.println(box->getBoxWeight());
+  // modifyJsonField("/config.json", "boxWeight", String(box->getBoxWeight()));
+}
+
+void modifyJsonField(const char* filename, const char* field, const char* value) {
+  // Open the JSON file in read-write mode
+  File file = LittleFS.open(filename, "r+");
+  if (!file) {
+    Serial.println("Failed to open JSON file for reading and writing");
+    return;
+  }
+
+  // Read the contents of the file into a DynamicJsonDocument
+  const size_t capacity = JSON_OBJECT_SIZE(JSON_SIZE); // Adjust the capacity as per your JSON structure
+  DynamicJsonDocument doc(capacity);
+  DeserializationError error = deserializeJson(doc, file);
+  if (error) {
+    Serial.println("Failed to parse JSON file");
+    file.close();
+    return;
+  }
+
+  // Modify the specified field
+  JsonObject root = doc.as<JsonObject>();
+  root[field] = value;
+
+  // Clear the file content and write the updated JSON data
+  file.seek(0);
+  file.truncate(JSON_SIZE);
+  if (serializeJson(doc, file) == 0) {
+    Serial.println("Failed to write JSON data to file");
+  }
+
+  // Close the file
+  file.close();
 }

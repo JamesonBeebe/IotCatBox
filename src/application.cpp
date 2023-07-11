@@ -1,6 +1,6 @@
 #include "application.h"
 
-Application::Application(float weight = 1.8){
+Application::Application(float weight){
     this->platformWeight = weight;
 }
 
