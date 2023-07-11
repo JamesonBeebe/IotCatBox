@@ -1,5 +1,4 @@
 #include "application.h"
-#include <Arduino.h>
 
 Application::Application(float weight = 1.8){
     this->platformWeight = weight;

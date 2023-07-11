@@ -2,7 +2,7 @@
 #define CAT_H
 #include <Arduino.h>
 
-typedef enum Gender{
+enum Gender{
   FEMALE,
   MALE
 };

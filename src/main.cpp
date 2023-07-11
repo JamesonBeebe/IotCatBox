@@ -11,8 +11,13 @@
 #include <ESPAsyncTCP.h> //used for OTA and web GUI
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
-#include "index.htm"
 #include "version.h"
+#include <LittleFS.h>
+#include <SPI.h>
+
+/************************ FileSystem  Configuration ************************/
+const size_t MEMORY_SIZE = 16 * 1024 * 1024; // 16MB
+
 /************************ Thingspeak  Configuration ************************/
 //#define NO_SERVER
 // visit thingspeak.com if you need to create an account or if you need your write key.
@@ -98,6 +103,8 @@ void cleaningLoop(void);
 void measurePoopAfterCat(void);
 void weighCat(void);
 void waitForScaleStable(void);
+void measurePlatformWeight(void);
+void measureBoxWeight(void);
 
 enum State
 {
@@ -119,6 +126,12 @@ void setup()
   Serial.println("IoT CatBox by: Jameson Beebe\r\n");
   Serial.printf("V%s\r\n", VERSION);
 
+  // Initialize LittleFS this is where the web GUI is stored
+  if(!LittleFS.begin()){
+    Serial.println("An Error has occurred while mounting LittleFS");
+    return;
+  }
+  File file = LittleFS.open("/index.htm", "r");
   
   pinMode(reed_switch_PIN, INPUT_PULLUP); //This is for a Mag Switch if one is used for the Lid (not currently implemented)
 
@@ -180,7 +193,7 @@ void setup()
 
   // Start GUI
   gui.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-         { request->send_P(200, "text/html", index_html, processor); });
+         { request->send(LittleFS, "/index.htm", "text/html"); });         
   gui.on("/updateState", HTTP_GET, [](AsyncWebServerRequest *request)
          { request->send(200, "text/plain", String(getCurrentState())); });
   // Route for getting variable values
@@ -191,6 +204,10 @@ void setup()
                       String(",\"version\":") + "\"" + String(VERSION_SHORT) + "\"" + "}";
     request->send(200, "application/json", response); });
   gui.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request)
+         { restartEsp(); });
+  gui.on("/measurePlatform", HTTP_GET, [](AsyncWebServerRequest *request)
+         { measurePlatformWeight(); });
+  gui.on("/measureBox", HTTP_GET, [](AsyncWebServerRequest *request)
          { restartEsp(); });
   gui.begin();
 
@@ -377,18 +394,6 @@ void measurePoopAfterCat(void)
   Serial.println("Cat Left the box... Weigh poop");
   
   box->setPooWeight(readScaleFloat());
-
-  // if (cat1Use)
-  // {
-  //   cat1->setCurrentWeight(box->lastStableWeight - box->getPooWeight());
-  //   ThingSpeak.setField(CAT_1_WEIGHT, (float)(cat1->getCurrentWeight()*2.2)); // set measured value to cat #1
-  // }
-  // else
-  // {
-  //   cat2->setCurrentWeight(box->lastStableWeight - box->getPooWeight());
-  //   ThingSpeak.setField(CAT_2_WEIGHT, (float)(cat2->getCurrentWeight()*2.2)); // set measured value to cat #2
-  // }
-
   ThingSpeak.setField(POO_WEIGHT, (float)(box->getPooWeight() * 2.2)); // convert to lbs and send to ThingSpeak
 
   newData = true;
@@ -649,4 +654,19 @@ void waitForScaleStable(void){
     box->setLastWeight(box->getCurrentWeight());
     box->setCurrentWeight(readScaleFloat());
     delay(100);}
+}
+
+void measurePlatformWeight(void){
+  Serial.println("Measuring platform weight");
+  resetScale();
+  application->setPlatformWeight(readScaleFloat());
+  Serial.print("Platform weight: ");
+  Serial.println(application->getPlatformWeight());
+  }
+
+void measureBoxWeight(void){
+  Serial.println("Measuring box weight");
+  box->setBoxWeight(readScaleFloat());
+  Serial.print("Box weight: ");
+  Serial.println(box->getBoxWeight());
 }

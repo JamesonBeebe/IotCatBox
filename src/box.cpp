@@ -96,3 +96,9 @@ void Box::zeroPooValue(void)
     Serial.println("Zeroing poo value");
     this->setPooWeight(0);
 }
+
+void Box::setBoxWeight(float weight)
+{
+    this->boxWeight = weight;
+    return;
+}

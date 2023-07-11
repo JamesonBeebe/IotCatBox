@@ -32,6 +32,7 @@ class Box {
     //Setter Functions
     void setCurrentWeight(float weight);
     void setLastWeight(float weight);
+    void setBoxWeight(float weight);
     void setPooWeight(float weight);
     float setSandWeight(float weight);    
 
